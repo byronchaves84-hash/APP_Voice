@@ -88,11 +88,40 @@ class TikTokConnector(
         val method = builder.javaClass.methods.firstOrNull { it.name == methodName && it.parameterCount == 1 } ?: return
         val iface = method.parameterTypes[0]
         if (!iface.isInterface) return
-        val proxy = Proxy.newProxyInstance(iface.classLoader, arrayOf(iface)) { _, methodCalled, args ->
-            if (methodCalled.name in listOf("accept", "invoke", "call")) callback(args ?: emptyArray())
-            null
+        val proxy = Proxy.newProxyInstance(iface.classLoader, arrayOf(iface)) { proxyInstance, methodCalled, args ->
+            // Java proxies can receive Object methods too. Returning null for hashCode()
+            // causes: "Expected to unbox int primitive type but was returned null".
+            when {
+                methodCalled.declaringClass == Any::class.java && methodCalled.name == "hashCode" ->
+                    System.identityHashCode(proxyInstance)
+                methodCalled.declaringClass == Any::class.java && methodCalled.name == "equals" ->
+                    proxyInstance === args?.firstOrNull()
+                methodCalled.declaringClass == Any::class.java && methodCalled.name == "toString" ->
+                    "MoortyTikTokCallback(${iface.name})"
+                methodCalled.name in listOf("accept", "invoke", "call") -> {
+                    callback(args ?: emptyArray())
+                    null
+                }
+                else -> primitiveDefault(methodCalled.returnType)
+            }
         }
         method.invoke(builder, proxy)
+    }
+
+    private fun primitiveDefault(type: Class<*>): Any? {
+        if (!type.isPrimitive) return null
+        return when (type) {
+            java.lang.Boolean.TYPE -> false
+            java.lang.Character.TYPE -> 0.toChar()
+            java.lang.Byte.TYPE -> 0.toByte()
+            java.lang.Short.TYPE -> 0.toShort()
+            java.lang.Integer.TYPE -> 0
+            java.lang.Long.TYPE -> 0L
+            java.lang.Float.TYPE -> 0f
+            java.lang.Double.TYPE -> 0.0
+            java.lang.Void.TYPE -> null
+            else -> null
+        }
     }
 
     private fun eventText(root: Any?, vararg path: String): String {
