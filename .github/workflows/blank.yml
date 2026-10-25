@@ -1,4 +1,4 @@
-
+```yaml
 name: Build Voice APK
 
 on:
@@ -25,16 +25,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Preparar Android SDK
+      - name: Configurar Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Instalar paquetes Android
-        shell: bash
-        run: |
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -45,13 +39,13 @@ jobs:
         shell: bash
         run: |
           if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
-            echo "ERROR: No se encontro settings.gradle(.kts) en la raiz"
-            find . -maxdepth 4 \( -name settings.gradle -o -name settings.gradle.kts \)
+            echo "ERROR: No se encontro settings.gradle o settings.gradle.kts"
+            find . -maxdepth 5 \( -name settings.gradle -o -name settings.gradle.kts \)
             exit 1
           fi
 
           if [ ! -f "app/build.gradle.kts" ] && [ ! -f "app/build.gradle" ]; then
-            echo "ERROR: No se encontro el archivo de configuracion de app"
+            echo "ERROR: No se encontro la configuracion de la app"
             exit 1
           fi
 
@@ -65,3 +59,4 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 7
+```
