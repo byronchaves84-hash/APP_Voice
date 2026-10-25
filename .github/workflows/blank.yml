@@ -28,51 +28,40 @@ jobs:
       - name: Preparar Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Aceptar licencias de Android
+      - name: Instalar paquetes Android
         shell: bash
         run: |
-          set +o pipefail
-          yes | sdkmanager --licenses
-          result=${PIPESTATUS[1]}
-          if [ "$result" -ne 0 ]; then
-            echo "Error al aceptar las licencias del SDK"
-            exit "$result"
-          fi
-
-      - name: Instalar paquetes Android
-        run: |
-          sdkmanager \
+          sdkmanager --install \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
-
-      - name: Encontrar proyecto Android
-        id: project
-        shell: bash
-        run: |
-          if [ -f "$GITHUB_WORKSPACE/settings.gradle.kts" ]; then
-            echo "dir=." >> "$GITHUB_OUTPUT"
-          elif [ -f "$GITHUB_WORKSPACE/MoortyVoice_Android/settings.gradle.kts" ]; then
-            echo "dir=MoortyVoice_Android" >> "$GITHUB_OUTPUT"
-          else
-            echo "No se encontro settings.gradle.kts"
-            find . -maxdepth 5 -name settings.gradle.kts
-            exit 1
-          fi
 
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
+      - name: Verificar proyecto Android
+        shell: bash
+        run: |
+          if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
+            echo "ERROR: No se encontro settings.gradle(.kts) en la raiz"
+            find . -maxdepth 4 \( -name settings.gradle -o -name settings.gradle.kts \)
+            exit 1
+          fi
+
+          if [ ! -f "app/build.gradle.kts" ] && [ ! -f "app/build.gradle" ]; then
+            echo "ERROR: No se encontro el archivo de configuracion de app"
+            exit 1
+          fi
+
       - name: Compilar APK
-        working-directory: ${{ steps.project.outputs.dir }}
         run: gradle assembleDebug
 
       - name: Guardar APK
         uses: actions/upload-artifact@v4
         with:
           name: Voice-Android-debug-APK
-          path: ${{ steps.project.outputs.dir }}/app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 7
